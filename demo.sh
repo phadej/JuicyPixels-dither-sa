@@ -21,3 +21,4 @@ run "$JUICYDITHER" --iterations 8 demo/MichelangeloDavid.png demo/MichelangeloDa
 run "$JUICYDITHER" --iterations 1 demo/phadej.png demo/phadej-1.png
 run "$JUICYDITHER" --iterations 8 demo/phadej.png demo/phadej-dither.png
 run "$JUICYDITHER" --algorithm FS demo/phadej.png demo/phadej-fs.png
+run "$JUICYDITHER" --iterations 2 --algorithm FSSA demo/phadej.png demo/phadej-fssa-2.png

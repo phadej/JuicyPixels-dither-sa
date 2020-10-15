@@ -28,6 +28,7 @@ data Opts = Opts
 data Algo
     = FS
     | SA
+    | FSSA
   deriving (Show, Read)
 
 main :: IO ()
@@ -63,8 +64,9 @@ processImage algo options src dst = do
             let img = convertRGBA8 dimg
             let mon = monochrome img
             let res = case algo of
-                    SA -> dither options mon
-                    FS -> FS.dither mon
+                    SA   -> dither options mon
+                    FS   -> FS.dither mon
+                    FSSA -> dither options { optionsInitialImage = Just (FS.dither mon) } mon
             writePng dst res
 
 processImage2 :: Algo -> Options -> FilePath -> IO ()
@@ -95,8 +97,9 @@ processImage2 algo options src = do
 
             let mon = monochrome img1
             let res = case algo of
-                    SA -> dither options mon
-                    FS -> FS.dither mon
+                    SA   -> dither options mon
+                    FS   -> FS.dither mon
+                    FSSA -> dither options { optionsInitialImage = Just (FS.dither mon) } mon
 
             -- we assume black background
             let background :: Bool

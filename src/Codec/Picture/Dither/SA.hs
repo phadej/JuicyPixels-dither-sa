@@ -14,9 +14,10 @@ module Codec.Picture.Dither.SA (
 ) where
 
 import Codec.Picture
-import Data.Bits               (testBit)
-import Data.Word               (Word64, Word8)
-import Text.Printf             (printf)
+import Control.Monad (forM_)
+import Data.Bits     (testBit)
+import Data.Word     (Word64, Word8)
+import Text.Printf   (printf)
 
 import qualified Data.Primitive         as Prim
 import qualified Data.Vector            as V
@@ -122,15 +123,16 @@ foldingK s0 (Kernel4 a b c d) ff = do
 -------------------------------------------------------------------------------
 
 data Options = Options
-    { optionsPrngSeed :: !Word64 -- ^ Seed for random number generator
-    , optionsIterationC  :: !Int
+    { optionsPrngSeed     :: !Word64  -- ^ Seed for random number generator
+    , optionsIterationC   :: !Int     -- ^ Iterations rounds to perform
+    , optionsInitialImage :: Maybe (Image Pixel8) -- ^ initial image to start processing from. If 'Nothing' we start from random.
     }
-  deriving Show
 
 defaultOptions :: Options
 defaultOptions = Options
-    { optionsPrngSeed   = 0xFEEDBACC
-    , optionsIterationC = 8
+    { optionsPrngSeed     = 0xFEEDBACC
+    , optionsIterationC   = 8
+    , optionsInitialImage = Nothing
     }
 
 -------------------------------------------------------------------------------
@@ -231,11 +233,19 @@ dither Options {..} img = img
                 return $! acc + sq diff
             {-# INLINE neighborEnergy #-}
 
-        -- random initialisation
-        g1 <- foldingM g0 [0..len-1] $ \g i -> do
-            let (w64, g') = SM.nextWord64 g
-            Prim.writePrimArray work i (if testBit w64 0 then 1 else 0 :: Word8)
-            return g'
+        -- initialisation
+        g1 <- case optionsInitialImage of
+            Just iniImg | imageWidth iniImg == w , imageHeight iniImg == h -> do
+                forM_ [0..len-1] $ \i -> do
+                    let w8 = imageData iniImg VS.! i
+                    Prim.writePrimArray work i (if w8 > 127 then 1 else 0 :: Word8)
+
+                return g0
+
+            _ -> foldingM g0 [0..len-1] $ \g i -> do
+                let (w64, g') = SM.nextWord64 g
+                Prim.writePrimArray work i (if testBit w64 0 then 1 else 0 :: Word8)
+                return g'
 
         e0 <- slowenergy
         debug $ "post init: " ++ show (scale e0)
