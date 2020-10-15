@@ -22,6 +22,7 @@ data Opts = Opts
     , optsOutput     :: Maybe FilePath
     , optsIterations :: Int
     , optsAlgorithm  :: Algo
+    , optsMode       :: Mode
     }
   deriving (Show)
 
@@ -31,14 +32,19 @@ data Algo
     | FSSA
   deriving (Show, Read)
 
+data Mode
+    = Braille
+    | Box
+  deriving (Eq, Show, Read)
+
 main :: IO ()
 main = do
     Opts {..} <- O.execParser opts
     let options = defaultOptions { optionsIterationC = optsIterations }
 
     case optsOutput of
-        Nothing -> processImage2 optsAlgorithm options optsInput
-        Just o  -> processImage  optsAlgorithm options optsInput o
+        Nothing -> processImage2 optsAlgorithm optsMode options optsInput
+        Just o  -> processImage  optsAlgorithm          options optsInput o
   where
     opts = O.info (optsP <**> O.helper) $ mconcat
         [ O.fullDesc
@@ -51,7 +57,8 @@ optsP = Opts
     <$> O.strArgument (O.metavar "INPUT" <> O.help "Input image")
     <*> optional (O.strArgument (O.metavar "OUTPUT" <> O.help "Output image"))
     <*> O.option O.auto (O.long "iterations" <> O.metavar "ITERS" <> O.help "How many iterations to perform (times the image size)" <> O.value 8 <> O.showDefault)
-    <*> O.option O.auto (O.long "algorithm" <> O.metavar "ALGO" <> O.help "Algoorithm" <> O.value SA <> O.showDefault)
+    <*> O.option O.auto (O.long "algorithm" <> O.metavar "ALGO" <> O.help "Algorithm" <> O.value SA <> O.showDefault)
+    <*> O.option O.auto (O.long "mode" <> O.metavar "MODE" <> O.help "Console mode" <> O.value Braille <> O.showDefault)
 
 processImage :: Algo -> Options -> FilePath -> FilePath -> IO ()
 processImage algo options src dst = do
@@ -69,8 +76,8 @@ processImage algo options src dst = do
                     FSSA -> dither options { optionsInitialImage = Just (FS.dither mon) } mon
             writePng dst res
 
-processImage2 :: Algo -> Options -> FilePath -> IO ()
-processImage2 algo options src = do
+processImage2 :: Algo -> Mode -> Options -> FilePath -> IO ()
+processImage2 algo mode options src = do
     eimg <- readImage src
     case eimg of
         Left err -> do
@@ -78,19 +85,30 @@ processImage2 algo options src = do
             exitFailure
 
         Right dimg -> do
-            let maxW = 140
-                maxH = 80
+            let (maxW, maxH) = case mode of
+                    Braille -> (140, 80)
+                    Box     -> (70, 40)
 
             let img0 = convertRGBA8 dimg
-            let img1 | imageWidth img0 <= maxH && imageWidth img0 <= maxH = img0
+
+            let img1 | imageWidth img0 <= maxH
+                     , imageWidth img0 <= maxH
+                     , mode /= Box
+                     = img0
+
                      | otherwise =
                     let w = imageWidth img0
                         h = imageHeight img0
 
+                        -- boxes need to be double wide
+                        aspect :: Int
+                        aspect = case mode of
+                            Braille -> 1
+                            Box     -> 2
 
                     in if h * maxW > maxH * w
-                       then scaleWithKernel (w * maxH `div` h, maxH) kernel img0
-                       else scaleWithKernel (maxW, h * maxW `div` w) kernel img0
+                       then scaleWithKernel (aspect * w * maxH `div` h, maxH) kernel img0
+                       else scaleWithKernel (aspect * maxW, h * maxW `div` w) kernel img0
 
             let w    = imageWidth img1
                 h    = imageHeight img1
@@ -100,6 +118,8 @@ processImage2 algo options src = do
                     SA   -> dither options mon
                     FS   -> FS.dither mon
                     FSSA -> dither options { optionsInitialImage = Just (FS.dither mon) } mon
+
+            -- "rendering" helpers
 
             -- we assume black background
             let background :: Bool
@@ -114,23 +134,56 @@ processImage2 algo options src = do
             let thisBitIs i True  x = setBit x i
                 thisBitIs i False x = clearBit x i
 
-            ls <- forM [ 0 .. h `div` 4 ] $ \y -> forM [ 0.. w `div` 2 ] $ \x -> do
-                let off = 0
-                        & thisBitIs 0 (isWhite (2 * x + 0) (4 * y + 0))
-                        & thisBitIs 1 (isWhite (2 * x + 0) (4 * y + 1))
-                        & thisBitIs 2 (isWhite (2 * x + 0) (4 * y + 2))
-                        & thisBitIs 3 (isWhite (2 * x + 1) (4 * y + 0))
-                        & thisBitIs 4 (isWhite (2 * x + 1) (4 * y + 1))
-                        & thisBitIs 5 (isWhite (2 * x + 1) (4 * y + 2))
-                        & thisBitIs 6 (isWhite (2 * x + 0) (4 * y + 3))
-                        & thisBitIs 7 (isWhite (2 * x + 1) (4 * y + 3))
+            case mode of
+                Braille -> do
+                    ls <- forM [ 0 .. h `div` 4 ] $ \y -> forM [ 0.. w `div` 2 ] $ \x -> do
+                        let off = 0
+                                & thisBitIs 0 (isWhite (2 * x + 0) (4 * y + 0))
+                                & thisBitIs 1 (isWhite (2 * x + 0) (4 * y + 1))
+                                & thisBitIs 2 (isWhite (2 * x + 0) (4 * y + 2))
+                                & thisBitIs 3 (isWhite (2 * x + 1) (4 * y + 0))
+                                & thisBitIs 4 (isWhite (2 * x + 1) (4 * y + 1))
+                                & thisBitIs 5 (isWhite (2 * x + 1) (4 * y + 2))
+                                & thisBitIs 6 (isWhite (2 * x + 0) (4 * y + 3))
+                                & thisBitIs 7 (isWhite (2 * x + 1) (4 * y + 3))
 
-                -- https://en.wikipedia.org/wiki/Braille_Patterns#Block
-                let character = chr $ 0x2800 + off
-                return character
+                        -- https://en.wikipedia.org/wiki/Braille_Patterns#Block
+                        let character = chr $ 0x2800 + off
+                        return character
 
-            putStrLn $ unlines ls
+                    putStrLn $ unlines ls
 
+                Box -> do
+                    let boxes :: [Char]
+                        boxes =
+                            [ ' '
+                            , '▘'
+                            , '▖'
+                            , '▌'
+                            , '▝'
+                            , '▀'
+                            , '▞'
+                            , '▛'
+                            , '▗'
+                            , '▚'
+                            , '▄'
+                            , '▙'
+                            , '▐'
+                            , '▜'
+                            , '▟'
+                            , '█'
+                            ]
+                    ls <- forM [0 .. h `div` 2 ] $ \y -> forM [ 0 .. w `div` 2 ] $ \x -> do
+                        let off = 0
+                                & thisBitIs 0 (isWhite (2 * x + 0) (2 * y + 0))
+                                & thisBitIs 1 (isWhite (2 * x + 0) (2 * y + 1))
+                                & thisBitIs 2 (isWhite (2 * x + 1) (2 * y + 0))
+                                & thisBitIs 3 (isWhite (2 * x + 1) (2 * y + 1))
+
+                        let character = boxes !! off
+                        return character
+
+                    putStrLn $ unlines ls
 
 kernel :: Int -> Int -> Double
 kernel 0 0 = 1.75
