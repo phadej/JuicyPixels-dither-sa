@@ -28,6 +28,7 @@ library
 
   exposed-modules:
     Codec.Picture.Dither.SA
+    Codec.Picture.Dither.FS
     Codec.Picture.Grayscale
 
 executable juicydither

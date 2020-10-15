@@ -11,8 +11,6 @@ run() {
 # Braille
 run "$JUICYDITHER" --iterations 8 demo/MichelangeloDavid.png
 
-exit 0
-
 # Small image
 run "$JUICYDITHER" --iterations 8 demo/phadej-small.png demo/phadej-small-dither.png
 
@@ -22,3 +20,4 @@ run "$JUICYDITHER" --iterations 8 demo/MichelangeloDavid.png demo/MichelangeloDa
 # Bigger image
 run "$JUICYDITHER" --iterations 1 demo/phadej.png demo/phadej-1.png
 run "$JUICYDITHER" --iterations 8 demo/phadej.png demo/phadej-dither.png
+run "$JUICYDITHER" --algorithm FS demo/phadej.png demo/phadej-fs.png

@@ -14,14 +14,21 @@ import Data.Char               (chr)
 import Data.Function           ((&))
 import System.Exit             (exitFailure)
 
+import qualified Codec.Picture.Dither.FS as FS
 import qualified Options.Applicative as O
 
 data Opts = Opts
     { optsInput      :: FilePath
     , optsOutput     :: Maybe FilePath
     , optsIterations :: Int
+    , optsAlgorithm  :: Algo
     }
   deriving (Show)
+
+data Algo
+    = FS
+    | SA
+  deriving (Show, Read)
 
 main :: IO ()
 main = do
@@ -29,8 +36,8 @@ main = do
     let options = defaultOptions { optionsIterationC = optsIterations }
 
     case optsOutput of
-        Nothing -> processImage2 options optsInput
-        Just o  -> processImage options optsInput o
+        Nothing -> processImage2 optsAlgorithm options optsInput
+        Just o  -> processImage  optsAlgorithm options optsInput o
   where
     opts = O.info (optsP <**> O.helper) $ mconcat
         [ O.fullDesc
@@ -43,9 +50,10 @@ optsP = Opts
     <$> O.strArgument (O.metavar "INPUT" <> O.help "Input image")
     <*> optional (O.strArgument (O.metavar "OUTPUT" <> O.help "Output image"))
     <*> O.option O.auto (O.long "iterations" <> O.metavar "ITERS" <> O.help "How many iterations to perform (times the image size)" <> O.value 8 <> O.showDefault)
+    <*> O.option O.auto (O.long "algorithm" <> O.metavar "ALGO" <> O.help "Algoorithm" <> O.value SA <> O.showDefault)
 
-processImage :: Options -> FilePath -> FilePath -> IO ()
-processImage options src dst = do
+processImage :: Algo -> Options -> FilePath -> FilePath -> IO ()
+processImage algo options src dst = do
     eimg <- readImage src
     case eimg of
         Left err -> do
@@ -54,11 +62,13 @@ processImage options src dst = do
         Right dimg -> do
             let img = convertRGBA8 dimg
             let mon = monochrome img
-            let res = dither options mon
+            let res = case algo of
+                    SA -> dither options mon
+                    FS -> FS.dither mon
             writePng dst res
 
-processImage2 :: Options -> FilePath -> IO ()
-processImage2 options src = do
+processImage2 :: Algo -> Options -> FilePath -> IO ()
+processImage2 algo options src = do
     eimg <- readImage src
     case eimg of
         Left err -> do
@@ -84,7 +94,9 @@ processImage2 options src = do
                 h    = imageHeight img1
 
             let mon = monochrome img1
-            let res = dither options mon
+            let res = case algo of
+                    SA -> dither options mon
+                    FS -> FS.dither mon
 
             -- we assume black background
             let background :: Bool
