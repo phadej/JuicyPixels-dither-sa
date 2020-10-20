@@ -62,26 +62,20 @@ toKernel [a,b,c,d,e,f]       = Kernel6 a b c d e f
 toKernel [a,b,c,d,e,f,g,h,i] = Kernel9 a b c d e f g h i
 toKernel k                   = error $ "panic: Kernel of invalid size: " ++ show k
 
--- def normd(x,y): return 2.0 * ivar / np.pi * np.exp(-0.5 * ivar * (x*x+ y*y))
-_kernel :: Int -> Int -> Double
-_kernel 0 0 = 1.864259770697569    -- integrate.dblquad(normd, 0, 1, lambda x: 0, lambda x: 1)[0] * 4
-_kernel 0 1 = 0.42956285411878575  -- integrate.dblquad(normd, 1, 3, lambda x: 0, lambda x: 1)[0] * 2
-_kernel 1 0 = 0.42956285411878575
-_kernel 1 1 = 0.09897989997908489  -- integrate.dblquad(normd, 1, 3, lambda x: 1, lambda x: 3)[0] * 1
-_kernel _ _ = 0.0
-
 kernel :: Int -> Int -> Double
--- Normal:
--- kernel 0 0 = 0.46859173138000354
--- kernel 0 1 = 0.10797293634284622
--- kernel 1 0 = 0.10797293634284622
--- kernel 1 1 = 0.02487913081215289
---
--- Triangle:
+-- Triangle and box
 kernel 0 0 = 0.30864197530864196
 kernel 0 1 = 0.12345679012345678
 kernel 1 0 = 0.12345679012345678
 kernel 1 1 = 0.04938271604938271
+--
+-- Double triangle
+-- kernel 0 0 = 0.4444444444444444 -- 4/9
+-- kernel 0 1 = 0.1111111111111111 -- 1/9
+-- kernel 1 0 = 0.1111111111111111 -- 1/9
+-- kernel 1 1 = 0.0277777777777777 -- 1/36
+
+-- outside
 kernel _ _ = 0.0
 
 -------------------------------------------------------------------------------

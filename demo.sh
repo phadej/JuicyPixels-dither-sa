@@ -22,3 +22,17 @@ run "$JUICYDITHER" --iterations 1 demo/phadej.png demo/phadej-1.png
 run "$JUICYDITHER" --iterations 8 demo/phadej.png demo/phadej-dither.png
 run "$JUICYDITHER" --algorithm FS demo/phadej.png demo/phadej-fs.png
 run "$JUICYDITHER" --iterations 2 --algorithm FSSA demo/phadej.png demo/phadej-fssa-2.png
+
+# Greys
+gray() {
+	GRAY=$1
+	run "$JUICYDITHER" --iterations 8 "demo/gray$GRAY.png" "demo/gray$GRAY-sa.png"
+	run "$JUICYDITHER" --algorithm FS "demo/gray$GRAY.png" "demo/gray$GRAY-fs.png"
+}
+
+gray 55
+gray 66
+gray 77
+gray 88
+gray 99
+gray AA
